@@ -160,5 +160,6 @@
    
     (setq arms (vla-InsertBlock mspace ptvar "sprinkler" 1 1 1 0))
     (setq myReactor (vlr-object-reactor (list arms) "My Reactor" '((:vlr-modified . getarms))))
+	(vlr-pers myReactor)
 	(vlax-put-property arms 'InsertionPoint ptvar)
 )

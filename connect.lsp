@@ -1,12 +1,12 @@
-(defun c:css ()
+(defun c:css (/ poly offset objpoly)
    (setq poly (car (entsel "\nPick polyline representing boundary...")))
    (setq offset (getreal "\nEnter desired offset"))
    (setq objpoly (vlax-ename->vla-object poly))
    (connectsprinkler objpoly offset)
 )
 
-(defun connectsprinkler (objpoly offset)
-   (while (setq sprinkler (car (entsel "\nPick on sprinkler...")))
+(defun connectsprinkler (objpoly offset / sprinkler objsprinkler objarms)
+  (while   (setq sprinkler (car (entsel "\nPick on sprinkler...")))
       (setq objsprinkler (vlax-ename->vla-object sprinkler))
 	  (if (setq objarms (getsprinklerarms objsprinkler))
          (move-to-edge objarms objpoly offset)
@@ -14,7 +14,7 @@
    )
  )
  
-(defun move-to-edge (objsprinkler objpoly offset)
+(defun move-to-edge (objsprinkler objpoly offset / pt-sprinkler ptnear ptnew)
 (princ "\n000")
     (setq pt-sprinkler (get-sprinkler-origin objsprinkler))
 	(princ "\n011")
@@ -28,14 +28,14 @@
 	(princ "\n055")
 )
 
-(defun add-vertices-to-poly (objpoly ptnew ptnear offset)
+(defun add-vertices-to-poly (objpoly ptnew ptnear offset / coords first final nn ptfirst x y addit pt1 pt2)
    (setq coords (vlax-variant-value (vlax-get-property objpoly 'Coordinates)))
    (setq first (vlax-safearray-get-l-bound coords 1))
-   (setq last (vlax-safearray-get-u-bound coords 1))
+   (setq final (vlax-safearray-get-u-bound coords 1))
    (setq nn first)
    (setq ptfirst nil)
    (princ "\n034")
-   (while (< nn last)
+   (while (< nn final)
       (setq x (vlax-safearray-get-element coords nn))
 	  (setq nn (1+ nn))
 	  (setq y (vlax-safearray-get-element coords nn))
@@ -47,13 +47,20 @@
 		 (progn
 			(if (inters pt1 pt2 ptnew (list 0 0.1) T)
                (progn
-			   (princ "\n036")
-
-					(princ "\n037")
-					(vlax-invoke-method objpoly 'AddVertex (- nn 3) (vlax-2D-point ptnear))
-					(vlax-invoke-method objpoly 'AddVertex (- nn 3) (vlax-2D-point ptnew )) ; if offset > 0
-					(vlax-invoke-method objpoly 'AddVertex (- nn 3) (vlax-2D-point ptnear))
-				;	(vlax-invoke-method mspace 'AddLine (vlax-3D-point ptnear) (vlax-3D-point ptnew ))
+			       ; (vlax-invoke-method mspace 'AddLine (vlax-3D-point pt1) (vlax-3D-point pt2 ))
+					;(princ nn)
+					;(getstring "\n")
+					(if flag
+					    (setq addit -1)
+						(setq addit 0)
+					)
+					(vlax-invoke-method objpoly 'AddVertex (+ addit (/ mincount 2)) (vlax-2D-point ptnear))
+					(vlax-invoke-method objpoly 'AddVertex (+ addit (/ mincount 2)) (vlax-2D-point ptnew )) ; if offset > 0
+					(if flag
+						(vlax-invoke-method objpoly 'AddVertex (+ addit (/ mincount 2)) (vlax-2D-point ptnear))
+					)
+					;(vlax-invoke-method mspace 'AddLine (vlax-3D-point ptnear) (vlax-3D-point ptnew ))
+					;(vlax-invoke-method objpoly 'AddVertex 0 (vlax-2D-point (getpoint)))
 				)
             )
          )	
@@ -79,16 +86,17 @@
    (vlax-put-property objsprinkler 'InsertionPoint (vlax-3D-point ptnew))
 )
 
-(defun get-closest-point (pt-sprinkler objpoly / x y nn first last)
+(defun get-closest-point (pt-sprinkler objpoly / coords pt3 x y nn first final ptfirst mindist pt2 pt4 pt6 pt5 minpoint mindist)
    (setq pt3 (vlax-safearray->list (vlax-variant-value pt-sprinkler)))
    (setq coords (vlax-variant-value (vlax-get-property objpoly 'Coordinates)))
  
    (setq first (vlax-safearray-get-l-bound coords 1))
-   (setq last (vlax-safearray-get-u-bound coords 1))
+   (setq final (vlax-safearray-get-u-bound coords 1))
    (setq nn first)
    (setq ptfirst nil)
    (setq mindist nil)
-   (while (< nn last)
+   (setq flag nil)
+   (while (< nn final)
       (setq x (vlax-safearray-get-element coords nn))
 	  (setq nn (1+ nn))
 	  (setq y (vlax-safearray-get-element coords nn))
@@ -107,6 +115,7 @@
 			         (setq mindist curmindist)
 					 (setq minpoint pt5)
 					 (setq mincount nn)
+					 (setq flag T)
 				  )
 			   )
 			   (if (> (distance pt1 pt3) (distance pt2 pt3))
@@ -139,7 +148,7 @@
    (vlax-get-property objsprinkler 'InsertionPoint)
 )
 
-(defun getsprinklerarms (objsprinkler)
+(defun getsprinklerarms (objsprinkler / handle arms obj-arms)
    (if (/= (vlax-get-property objsprinkler 'EffectiveName) "sprinkler")
       (progn
 	     (setq handle (vlax-get-property objsprinkler 'Name))
