@@ -4,3 +4,9 @@ FATAL ERROR:  Unhandled Access Violation Reading 0x0000 Exception at 62330d30h
 
 10/08/2012 at 22:27:05.953  Drawing: D:\Work\2043 France block\reactor.dwg
 -------------
+
+
+INTERNAL ERROR:  !dbattr.cpp@1034: eWasNotifying
+
+10/11/2012 at 22:14:13.531  Drawing: D:\Work\2043 France block\reactor.dwg
+-------------

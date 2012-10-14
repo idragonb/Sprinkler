@@ -1,6 +1,5 @@
 (defun c:css (/ poly offset objpoly)
    (setq poly (car (entsel "\nPick polyline representing boundary...")))
-   (setq offset (getreal "\nEnter desired offset"))
    (setq objpoly (vlax-ename->vla-object poly))
    (connectsprinkler objpoly offset)
 )
@@ -8,11 +7,29 @@
 (defun connectsprinkler (objpoly offset / sprinkler objsprinkler objarms)
   (while   (setq sprinkler (car (entsel "\nPick on sprinkler...")))
       (setq objsprinkler (vlax-ename->vla-object sprinkler))
+	  (setq offset (getoffset "Offset" objsprinkler))
 	  (if (setq objarms (getsprinklerarms objsprinkler))
          (move-to-edge objarms objpoly offset)
 	  )
    )
  )
+ 
+ (defun getoffset (chktag objsprinkler)
+   (setq atts (vlax-variant-value (vlax-invoke-method obj 'GetAttributes)))
+   (setq nn 0)
+   (setq lower (vlax-safearray-get-l-bound atts 1))
+   (setq upper (vlax-safearray-get-u-bound atts 1))
+   (while (<= nn upper)
+      (setq att (vlax-safearray-get-element atts nn))
+	  (setq tag (vlax-get-property att 'TagString))
+	  (setq val (vlax-get-property att 'TextString))
+	  (if (= tag chktag)
+		(setq retval (atof val))
+	  )
+	  (setq nn (1+ nn))
+	)
+	retval
+)
  
 (defun move-to-edge (objsprinkler objpoly offset / pt-sprinkler ptnear ptnew)
 (princ "\n000")
@@ -87,8 +104,8 @@
 )
 
 (defun get-closest-point (pt-sprinkler objpoly / coords pt3 x y nn first final ptfirst mindist pt2 pt4 pt6 pt5 minpoint mindist)
-   (setq pt3 (vlax-safearray->list (vlax-variant-value pt-sprinkler)))
-   (setq coords (vlax-variant-value (vlax-get-property objpoly 'Coordinates)))
+   (setq pt3 (vlax-safearray->list (vlax-variant-value pt-sprinkler)))			; get sprinkler origin
+   (setq coords (vlax-variant-value (vlax-get-property objpoly 'Coordinates)))	; polyline coordinates
  
    (setq first (vlax-safearray-get-l-bound coords 1))
    (setq final (vlax-safearray-get-u-bound coords 1))
