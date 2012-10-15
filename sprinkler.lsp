@@ -1,6 +1,8 @@
 (defun getarms (notifier-object reactor-object parameter-list)
 	(setq obj  notifier-object)                             ; the arms block
 
+
+
     (setq handlearms (vlax-get-property obj 'Handle))
 	(setq blkorg (vlax-get-property obj 'InsertionPoint))
 	
@@ -8,21 +10,20 @@
                ;get origin
 	
 
-	(setq acad (vlax-get-acad-object))
-	(setq doc (vlax-get-property acad 'ActiveDocument))
-	(setq mspace (vlax-get-property doc 'ModelSpace))
-	
-	(setq blks (vlax-get-property doc 'Blocks)) 
 	
 	;if exists, erase ********
 	(erase-subblock handlearms)
-	;(remove-connection handlearms)
+	;(remove-connection obj)
 
     ; create new
-	(setq blk (create-subblock blkorg handlearms))
+	(setq blk (create-subblock obj blkorg handlearms))
+	;(make-connection obj)
 
 
-	; get geometry from dynamic block **********************************************
+
+)
+
+(defun getdynamicproperty (obj property / props proplist nn prop propval retval) ; gets given dynamic property value from property name in dynamic block
 	(setq props (vlax-invoke-method obj 'GetDynamicBlockProperties))
 	(setq proplist (vlax-safearray->list (vlax-variant-value props)))
 	(setq nn 0)
@@ -31,22 +32,66 @@
 		;    (vlax-dump-object prop T)
 		(setq propname (vlax-get-property prop 'PropertyName))
 		(setq propval (vlax-variant-value (vlax-get-property prop 'Value)))
-		(cond
-			((= propname "ArmAngleRight") (setq angright propval))
-			((= propname "ArmLengthRight") (setq armlength propval))
-			((= propname "ArmAngleLeft") (setq angleft propval))
-			;      ((= propname "ArmLengthLeft") (setq armleft propval))
+		(if (= propname property)
+			(setq retval propval)
 		)
 		(setq nn (1+ nn))
 	)
+	retval
+)
+(defun setdynamicproperty (obj property val / )
+	(setq props (vlax-invoke-method obj 'GetDynamicBlockProperties))
+	(setq proplist (vlax-safearray->list (vlax-variant-value props)))
+	(setq nn 0)
+	(while (< nn (length proplist))
+		(setq prop (nth nn proplist))
+		;    (vlax-dump-object prop T)
+		(setq propname (vlax-get-property prop 'PropertyName))
+		;(setq propval (vlax-variant-value (vlax-get-property prop 'Value)))
+		(if (= propname property)
+			(vlax-put-property prop 'Value val)
+		)
+		(setq nn (1+ nn))
+	)
+	retval
+)
+(defun create-subblock (obj blkorg handlearms)
 
+
+
+	(setq acadd (vlax-get-acad-object))
+	(setq doc (vlax-get-property acadd 'ActiveDocument))
+	(setq mspace (vlax-get-property doc 'ModelSpace))
+	
+	(setq blks (vlax-get-property doc 'Blocks)) 
+
+
+	(setq objorigin (vlax-3D-point (list 0 0 0)))
+	(setq blk (vlax-invoke-method blks 'Add objorigin handlearms))                 ; create block
+	(vlax-invoke-method mspace 'InsertBlock blkorg handlearms 1 1 1 0)       ; insert it
+	
+	
+	
+	
+		; get geometry from dynamic block **********************************************
+	(setq angright (getdynamicproperty obj "ArmAngleRight"))
+	(setq armlength (getdynamicproperty obj "ArmLengthRight"))
+	(setq angleft (getdynamicproperty obj "ArmAngleLeft"))
 
 	;************************************************************************************
 	; create outer arc ********
+	
 	(setq obj-outerarc (vlax-invoke-method blk 'AddArc objorigin armlength angright angleft))
 	;(setq outerarc-color (getcolor-from-att "OuterLineColor" obj))
+	
+
 	(setq outerarc-color (getattribute "OuterLineColor" obj 1))
+
+	(setq color (vlax-get-property obj-outerarc 'TrueColor))
 	(vlax-put-property color 'ColorIndex outerarc-color); change to yellow
+	
+
+
 	(vlax-put-property obj-outerarc 'TrueColor color)
 
 
@@ -122,16 +167,19 @@
 	(vlax-invoke-method objringin 'Delete)
 	(vlax-invoke-method objringout 'Delete)
 		
-	
 	;*********************************************************
 
 	(setvar "osmode" curosmode)
 
-)
-(defun create-subblock (blkorg handlearms)
-	(setq objorigin (vlax-3D-point (list 0 0 0)))
-	(setq blk (vlax-invoke-method blks 'Add objorigin handlearms))                 ; create block
-	(vlax-invoke-method mspace 'InsertBlock blkorg handlearms 1 1 1 0)       ; insert it
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	blk
 )
 (defun getattribute (chktag blk type / nn lower upper att tag val retval) ; type 0 = string, 1 = integer, 2 = real
@@ -237,7 +285,6 @@
 	(setq coords (vlax-make-safearray vlax-vbDouble limits))
 	(vlax-safearray-fill coords newcoords)
 	(vlax-put-property obj-polyline 'Coordinates coords)
-	nn
 )
 (defun get-vertex-index (obj-polyline pt)
 	(setq coords (vlax-variant-value (vlax-get-property obj-polyline 'Coordinates)))
@@ -294,11 +341,15 @@
 ;(setq obj (vlax-ename->vla-object ent))
 ;(setq myReactor (vlr-object-reactor (list obj) "My Reactor" '((:vlr-modified . getarms))))
 
-(defun c:is ()     ; insert sprinkler
+(defun c:is ()     	; insert sprinkler
     (setq pt (getpoint "\nPick insertion point..."))
+	(insertsprinkler pt)
+)
+	
+(defun insertsprinkler (pt)
 	(setq ptvar (vlax-3D-point pt))
-	(setq acad (vlax-get-acad-object))
-	(setq doc (vlax-get-property acad 'ActiveDocument))
+	(setq acadd (vlax-get-acad-object))
+	(setq doc (vlax-get-property acadd 'ActiveDocument))
 	(setq mspace (vlax-get-property doc 'ModelSpace))
    
     (setq arms (vla-InsertBlock mspace ptvar "sprinkler" 1 1 1 0))
@@ -307,12 +358,27 @@
 	(vlr-pers myReactor)
 	(vlr-pers copyReactor)
 	(vlax-put-property arms 'InsertionPoint ptvar)
+	arms
 )
 
-(defun makecopy (notifier-object reactor-object parameter-list)
-   (setq copied notifier-object)
-       (setq myReactor (vlr-object-reactor (list copied) "My Reactor" '((:vlr-modified . getarms))))
-	(setq copyReactor (vlr-object-reactor (list copied) "Copy Reactor" '((:vlr-copied . makecopy))))
-	(vlr-pers myReactor)
-	(vlr-pers copyReactor)
+(defun c:cs ()		; copy sprinkler
+	(setq sprinkler1 (pick-sprinkler))
+	(setq pt (getpoint "\nPlease choose new insertion point..."))
+	(setq sprinkler2 (insertsprinkler pt))
+
+	(setattribute "HatchTypeInner" sprinkler2 (getattribute "HatchTypeInner" sprinkler1 0) 0)
+	(setattribute "HatchTypeOuter" sprinkler2 (getattribute "HatchTypeOuter" sprinkler1 0) 0)
+	(setattribute "HatchScaleInner" sprinkler2 (getattribute "HatchScaleInner" sprinkler1 0) 0)
+	(setattribute "HatchColorInner" sprinkler2 (getattribute "HatchColorInner" sprinkler1 0) 0)
+	(setattribute "InnerLineColor" sprinkler2 (getattribute "InnerLineColor" sprinkler1 0) 0)
+	(setattribute "InnerLineLinetype" sprinkler2 (getattribute "InnerLineLinetype" sprinkler1 0) 0)
+	(setattribute "HatchScaleOuter" sprinkler2 (getattribute "HatchScaleOuter" sprinkler1 0) 0)
+	(setattribute "HatchColorOuter" sprinkler2 (getattribute "HatchColorOuter" sprinkler1 0) 0)
+	(setattribute "OuterLineColor" sprinkler2 (getattribute "OuterLineColor" sprinkler1 0) 0)
+	(setattribute "OuterLineLinetype" sprinkler2 (getattribute "OuterLineLinetype" sprinkler1 0) 0)
+	(setattribute "OuterLineVisibility" sprinkler2 (getattribute "OuterLineVisibility" sprinkler1 0) 0)
+	(setattribute "Offset" sprinkler2 (getattribute "Offset" sprinkler1 0) 0)
+	(setattribute "SPRINKLERTYPE" sprinkler2 (getattribute "SPRINKLERTYPE" sprinkler1 0) 0)
+	
+	(vlax-put-property sprinkler2 'Rotation 0)
 )
